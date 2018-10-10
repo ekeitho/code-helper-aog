@@ -57,6 +57,6 @@ export default class GoogleConvo {
     }
 
     ask(str: Response) {
-        this.conv.ask();
+        this.conv.ask(str);
     }
 }
