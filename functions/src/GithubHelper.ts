@@ -1,6 +1,7 @@
 import {Authy, SocialIdentity} from "auth0-in-action/lib/Authy";
 import ActionsHelper from "./ActionsHelper";
 import GoogleConvo from "./GoogleConvo";
+import ConversationConstants from "./ConversationConstants";
 
 const request = require('request-promise-native');
 
@@ -147,8 +148,8 @@ export default class GithubHelper {
 
 
     static async firstTimeCreatedIssues(conv: GoogleConvo) {
-        const username = conv.getStorage<string>('userName');
-        const issueState = conv.getContextParamValueOrDefault('find_issues', 'issue-state', '');
+        const username = conv.getStorage<string>(ConversationConstants.STORAGE_USERNAME);
+        const issueState = conv.getContextParamValueOrDefault(ConversationConstants.CONTEXT_FIND_ISSUES, 'issue-state', '');
         const res = await GithubHelper.sendGithubGraphQL(conv, GithubHelper.createdIssuesQL(username, '', issueState));
 
         // information for paging
@@ -179,7 +180,7 @@ export default class GithubHelper {
                 case IssueEnum.MANY:
                     conv.ask(`Of the ${issuesCount} issues you've created. I found a few that are open.`);
                     conv.ask(ActionsHelper.generateBrowseCarouselItems(conv, issues));
-                    conv.setContext('find_issues-followup', 1,
+                    conv.setContext(ConversationConstants.CONTEXT_FIND_ISSUES_FOLLOW_UP, 1,
                         {
                             'position': quantity,
                             'issuesCount': issuesCount,
@@ -207,7 +208,7 @@ export default class GithubHelper {
                     conv.ask(`Of the ${issuesCount} issues you've created. I found a few that are open.`);
                     conv.ask(`The first issue is ${issues[0].title} under ${issues[0].repository.owner.login}'s repository ${issues[0].repository.name}. Would you like a link to this issue or get the next issue?`);
                     conv.saveToStorage('issue', issues[0]);
-                    conv.setContext('find_issues-followup', 1,
+                    conv.setContext(ConversationConstants.CONTEXT_FIND_ISSUES_FOLLOW_UP, 1,
                         {
                             'position': quantity,
                             'issuesCount': issuesCount,
@@ -221,7 +222,7 @@ export default class GithubHelper {
     static async nextCreatedIssues(conv: GoogleConvo) {
 
         const username = conv.getStorage<string>('userName');
-        const contextParams = conv.getContextParam('find_issues-followup');
+        const contextParams = conv.getContextParam(ConversationConstants.CONTEXT_FIND_ISSUES_FOLLOW_UP);
 
         const issuesCount = contextParams.issuesCount as number;
         const currentPosition = contextParams.position as number;
@@ -244,7 +245,7 @@ export default class GithubHelper {
                     break;
                 case IssueEnum.MANY:
                     console.log('hello?');
-                    conv.setContext('find_issues-followup', 1,
+                    conv.setContext(ConversationConstants.CONTEXT_FIND_ISSUES_FOLLOW_UP, 1,
                         {
                             'position': currentPosition + quantity,
                             'issuesCount': issuesCount,

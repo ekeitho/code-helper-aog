@@ -9,11 +9,11 @@ const {dialogflow} = require('actions-on-google');
 const app = dialogflow({debug: true});
 
 
-app.intent('Default Welcome Intent', conv => {
-    conv.ask(new SignIn());
+app.intent(ConversationConstants.INTENT_WELCOME, conv => {
+    conv.ask('Welcome to Code Helper. I can help you find issues you created or commented on github!');
 });
 
-app.intent('actions.intent.SIGN_IN', async (conv, params, signin) => {
+app.intent(ConversationConstants.INTENT_SIGN_IN, async (conv, params, signin) => {
     if (signin.status !== 'OK') {
         return conv.close('You need to sign in before using the app.');
     }
@@ -28,7 +28,7 @@ app.intent('actions.intent.SIGN_IN', async (conv, params, signin) => {
 });
 
 
-app.intent('actions.intent.NEW_SURFACE', (conv, params, newSurface) => {
+app.intent(ConversationConstants.INTENT_NEW_SURFACE, (conv, params, newSurface) => {
     if (newSurface) {
         if (newSurface.status === 'OK') {
             ActionsHelper.sendIssueCard(conv);
@@ -52,16 +52,16 @@ app.intent('send_link', (conv) => {
     }
 });
 
-app.intent('find_issues-next', async conv => {
+app.intent(ConversationConstants.INTENT_FIND_MORE_ISSUES, async conv => {
     await GithubHelper.nextCreatedIssues(conv);
 });
 
 
-app.intent('find_issues', async dialogConvo => {
+app.intent(ConversationConstants.INTENT_FIND_ISSUES, async dialogConvo => {
     const conv = new GoogleConvo(dialogConvo);
 
 
-    const userName = conv.getStorage<string>('userName');
+    const userName = conv.getStorage<string>(ConversationConstants.STORAGE_USERNAME);
 
     // we got an entity
     if (conv.hasEntity(ConversationConstants.ENTITY_ISSUES)) {
@@ -98,17 +98,17 @@ app.intent('find_issues', async dialogConvo => {
 
             conv.ask(`The past ${min} comments you made on issues. ${openIssuesCount} of them are open.`);
             if (conv.isScreenDevice()) {
-                conv.setContext('find_issues-followup', 1, {'position': 1, 'issue_count': 10});
+                conv.setContext(ConversationConstants.CONTEXT_FIND_ISSUES_FOLLOW_UP, 1, {'position': 1, 'issue_count': 10});
                 conv.ask(ActionsHelper.generateBrowseCarouselItems(conv, openIssues));
             }
         }
     } else {
         // if user asked for open/closed issues, but didn't specify created or commented on
         // then ask them, but save the state for later
-        if (conv.hasEntity('state-issue')) {
-            conv.setContext('find_issues', 1,
+        if (conv.hasEntity(ConversationConstants.ENTITY_ISSUE_STATE)) {
+            conv.setContext(ConversationConstants.CONTEXT_FIND_ISSUES, 1,
                 {
-                    'issue-state': conv.getEntity<string>('state-issue')
+                    'issue-state': conv.getEntity<string>(ConversationConstants.ENTITY_ISSUE_STATE)
                 }
             )
         }
