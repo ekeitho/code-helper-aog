@@ -149,7 +149,7 @@ export default class GithubHelper {
 
     static async firstTimeCreatedIssues(conv: GoogleConvo) {
         const username = conv.getStorage<string>(ConversationConstants.STORAGE_USERNAME);
-        const issueState = conv.getContextParamValueOrDefault(ConversationConstants.CONTEXT_FIND_ISSUES, 'issue-state', '');
+        const issueState = conv.getContextParamValueOrDefault(ConversationConstants.CONTEXT_FIND_ISSUES, 'issueState', '');
         const res = await GithubHelper.sendGithubGraphQL(conv, GithubHelper.createdIssuesQL(username, '', issueState));
 
         // information for paging
@@ -157,7 +157,7 @@ export default class GithubHelper {
         // startCursor - backward nav
         const pageInfo = res.data.user.issues.pageInfo;
 
-        // based on response, lets set some informaiton
+        // based on response, lets set some information
         const issues = res.data.user.issues.nodes;
         const issuesCount = res.data.user.issues.totalCount;
 
@@ -180,12 +180,6 @@ export default class GithubHelper {
                 case IssueEnum.MANY:
                     conv.ask(`Of the ${issuesCount} issues you've created. I found a few that are open.`);
                     conv.ask(ActionsHelper.generateBrowseCarouselItems(conv, issues));
-                    conv.setContext(ConversationConstants.CONTEXT_FIND_ISSUES_FOLLOW_UP, 1,
-                        {
-                            'position': quantity,
-                            'issuesCount': issuesCount,
-                            'nextCursor': pageInfo.endCursor
-                        });
                     break;
             }
         }
@@ -208,26 +202,30 @@ export default class GithubHelper {
                     conv.ask(`Of the ${issuesCount} issues you've created. I found a few that are open.`);
                     conv.ask(`The first issue is ${issues[0].title} under ${issues[0].repository.owner.login}'s repository ${issues[0].repository.name}. Would you like a link to this issue or get the next issue?`);
                     conv.saveToStorage('issue', issues[0]);
-                    conv.setContext(ConversationConstants.CONTEXT_FIND_ISSUES_FOLLOW_UP, 1,
-                        {
-                            'position': quantity,
-                            'issuesCount': issuesCount,
-                            'nextCursor': pageInfo.endCursor
-                        });
                     break;
             }
+        }
+
+        if (issueEnum === IssueEnum.MANY) {
+            conv.setContext(ConversationConstants.CONTEXT_FIND_ISSUES_FOLLOW_UP, 1,
+                {
+                    'position': quantity,
+                    'issuesCount': issuesCount,
+                    'nextCursor': pageInfo.endCursor,
+                    'issueState': issueState
+                });
         }
     }
 
     static async nextCreatedIssues(conv: GoogleConvo) {
 
-        const username = conv.getStorage<string>('userName');
+        const username = conv.getStorage<string>(ConversationConstants.STORAGE_USERNAME);
         const contextParams = conv.getContextParam(ConversationConstants.CONTEXT_FIND_ISSUES_FOLLOW_UP);
 
         const issuesCount = contextParams.issuesCount as number;
         const currentPosition = contextParams.position as number;
-
-        const res = await GithubHelper.sendGithubGraphQL(conv, GithubHelper.createdIssuesQL(username, contextParams.nextCursor as string));
+        const issueState = contextParams.issueState as string;
+        const res = await GithubHelper.sendGithubGraphQL(conv, GithubHelper.createdIssuesQL(username, contextParams.nextCursor as string, issueState));
 
         const issues = res.data.user.issues.nodes;
         const pageInfo = res.data.user.issues.pageInfo;

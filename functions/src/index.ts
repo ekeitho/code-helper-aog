@@ -108,7 +108,7 @@ app.intent(ConversationConstants.INTENT_FIND_ISSUES, async dialogConvo => {
         if (conv.hasEntity(ConversationConstants.ENTITY_ISSUE_STATE)) {
             conv.setContext(ConversationConstants.CONTEXT_FIND_ISSUES, 1,
                 {
-                    'issue-state': conv.getEntity<string>(ConversationConstants.ENTITY_ISSUE_STATE)
+                    'issueState': conv.getEntity<string>(ConversationConstants.ENTITY_ISSUE_STATE)
                 }
             )
         }
