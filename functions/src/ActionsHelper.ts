@@ -1,11 +1,7 @@
 import {BrowseCarousel, BrowseCarouselItem, Image} from "actions-on-google";
+import GoogleConvo from "./GoogleConvo";
 
 export default class ActionsHelper {
-
-    static isScreenDevice(conv): boolean {
-        return conv.surface.capabilities.has('actions.capability.SCREEN_OUTPUT');
-    }
-
 
     static generateBrowseCarouselItems(conv, issues): BrowseCarousel {
 

@@ -19,7 +19,8 @@ app.intent(ConversationConstants.INTENT_SIGN_IN, async (conv, params, signin) =>
     }
 
     try {
-        const gitToken = await GithubHelper.authenticateGithubUser(conv);
+        const googleConvo = new GoogleConvo(conv);
+        const gitToken = await GithubHelper.authenticateGithubUser(googleConvo);
         // possibly do something with access token
         conv.ask(`Great! Thanks for signing in ${gitToken.username}. What can I do for you today?`);
     } catch (err) {
@@ -60,7 +61,6 @@ app.intent(ConversationConstants.INTENT_FIND_MORE_ISSUES, async conv => {
 
 app.intent(ConversationConstants.INTENT_FIND_ISSUES, async dialogConvo => {
     const googleConvo = new GoogleConvo(dialogConvo);
-
 
     const userName = googleConvo.getStorage<string>(ConversationConstants.STORAGE_USERNAME);
 
