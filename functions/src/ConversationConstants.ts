@@ -17,5 +17,6 @@ export default class ConversationConstants {
 
     /* storage keys */
     static STORAGE_USERNAME = 'userName';
+    static STORAGE_TOKEN = 'token';
 
 }

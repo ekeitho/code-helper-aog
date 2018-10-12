@@ -56,7 +56,15 @@ export default class GoogleConvo {
         this.conv.user.storage[key] = value;
     }
 
+    hasInStorage(key: string): boolean {
+        return this.conv.user.storage.hasOwnProperty(key);
+    }
+
     ask(str: Response) {
         this.conv.ask(str);
+    }
+
+    getAccessToken(): string {
+        return this.conv.user.access.token;
     }
 }

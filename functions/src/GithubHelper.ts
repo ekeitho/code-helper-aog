@@ -81,19 +81,23 @@ export default class GithubHelper {
                             }`;
     }
 
-    static async authenticateGithubUser(conv): Promise<SocialIdentity> {
+    static async authenticateGithubUser(conv: GoogleConvo): Promise<SocialIdentity> {
 
         let gitToken = '';
         let user = '';
 
-        if (!conv.user.storage.hasOwnProperty('token')) {
 
+        if (conv.hasInStorage(ConversationConstants.STORAGE_TOKEN)) {
+            gitToken = conv.getStorage(ConversationConstants.STORAGE_TOKEN);
+            user = conv.getStorage(ConversationConstants.STORAGE_USERNAME);
+        }
+        else {
             const authy = new Authy('codehelpa',
                 'eqKAwhrdqUU2uZymuP419XJPF417P8rq',
                 'c8hTVXh8gK8FqU0om5aBlX8ONfa9X3DMhYdgRin-SP3ox0M6yoyzXWVHSYptaWwE'
             );
 
-            const {access_token, username} = await authy.getSocialIdentity(conv.user.access.token);
+            const {access_token, username} = await authy.getSocialIdentity(conv.getAccessToken());
 
             if (access_token && username) {
                 // save local scope vars for return
@@ -102,20 +106,20 @@ export default class GithubHelper {
                 user = username;
 
                 // save it for later so we dont have to do all these networks calls later
-                conv.user.storage.token = gitToken;
-                conv.user.storage.userName = user;
+                conv.saveToStorage<string>(ConversationConstants.STORAGE_TOKEN, gitToken);
+                conv.saveToStorage<string>(ConversationConstants.STORAGE_USERNAME, user);
             } else {
                 // report error
+                console.log('username: ' + username);
+                console.log('access_token: ' + access_token);
+                throw new Error('auth error');
             }
-        } else {
-            gitToken = conv.user.storage.token;
-            user = conv.user.storage.userName;
         }
 
         return {access_token: gitToken, username: user};
     }
 
-    static async sendGithubGraphQL(conv, graphQL: string) {
+    static async sendGithubGraphQL(conv: GoogleConvo, graphQL: string) {
         const gitToken = await GithubHelper.authenticateGithubUser(conv);
 
         const body = {query: graphQL};
@@ -222,6 +226,8 @@ export default class GithubHelper {
         const username = conv.getStorage<string>(ConversationConstants.STORAGE_USERNAME);
         const contextParams = conv.getContextParam(ConversationConstants.CONTEXT_FIND_ISSUES_FOLLOW_UP);
 
+        // didnt use get default here, because in order to get to 'next created issues'
+        // i know for sure i pass all these params in contextParams
         const issuesCount = contextParams.issuesCount as number;
         const currentPosition = contextParams.position as number;
         const issueState = contextParams.issueState as string;
