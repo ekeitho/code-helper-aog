@@ -53,26 +53,27 @@ app.intent('send_link', (conv) => {
 });
 
 app.intent(ConversationConstants.INTENT_FIND_MORE_ISSUES, async conv => {
-    await GithubHelper.nextCreatedIssues(conv);
+    const googleConvo = new GoogleConvo(conv);
+    await GithubHelper.nextCreatedIssues(googleConvo);
 });
 
 
 app.intent(ConversationConstants.INTENT_FIND_ISSUES, async dialogConvo => {
-    const conv = new GoogleConvo(dialogConvo);
+    const googleConvo = new GoogleConvo(dialogConvo);
 
 
-    const userName = conv.getStorage<string>(ConversationConstants.STORAGE_USERNAME);
+    const userName = googleConvo.getStorage<string>(ConversationConstants.STORAGE_USERNAME);
 
     // we got an entity
-    if (conv.hasEntity(ConversationConstants.ENTITY_ISSUES)) {
+    if (googleConvo.hasEntity(ConversationConstants.ENTITY_ISSUES)) {
         // created issues
-        if (conv.getEntity<string>(ConversationConstants.ENTITY_ISSUES) === 'create') {
-            await GithubHelper.firstTimeCreatedIssues(conv);
+        if (googleConvo.getEntity<string>(ConversationConstants.ENTITY_ISSUES) === 'create') {
+            await GithubHelper.firstTimeCreatedIssues(googleConvo);
         }
         // issues commented on
         else {
             const commentsToGrab = 20;
-            const res = await GithubHelper.sendGithubGraphQL(conv, GithubHelper.commentsOnIssuesQL(userName));
+            const res = await GithubHelper.sendGithubGraphQL(googleConvo, GithubHelper.commentsOnIssuesQL(userName));
 
             const issues = res.data.user.issueComments.nodes;
             const actualIssueCount = res.data.user.issueComments.totalCount;
@@ -96,23 +97,23 @@ app.intent(ConversationConstants.INTENT_FIND_ISSUES, async dialogConvo => {
                 openIssues.push(openIssuesNodes[key]);
             }
 
-            conv.ask(`The past ${min} comments you made on issues. ${openIssuesCount} of them are open.`);
-            if (conv.isScreenDevice()) {
-                conv.setContext(ConversationConstants.CONTEXT_FIND_ISSUES_FOLLOW_UP, 1, {'position': 1, 'issue_count': 10});
-                conv.ask(ActionsHelper.generateBrowseCarouselItems(conv, openIssues));
+            googleConvo.ask(`The past ${min} comments you made on issues. ${openIssuesCount} of them are open.`);
+            if (googleConvo.isScreenDevice()) {
+                googleConvo.setContext(ConversationConstants.CONTEXT_FIND_ISSUES_FOLLOW_UP, 1, {'position': 1, 'issue_count': 10});
+                googleConvo.ask(ActionsHelper.generateBrowseCarouselItems(googleConvo, openIssues));
             }
         }
     } else {
         // if user asked for open/closed issues, but didn't specify created or commented on
         // then ask them, but save the state for later
-        if (conv.hasEntity(ConversationConstants.ENTITY_ISSUE_STATE)) {
-            conv.setContext(ConversationConstants.CONTEXT_FIND_ISSUES, 1,
+        if (googleConvo.hasEntity(ConversationConstants.ENTITY_ISSUE_STATE)) {
+            googleConvo.setContext(ConversationConstants.CONTEXT_FIND_ISSUES, 1,
                 {
-                    'issueState': conv.getEntity<string>(ConversationConstants.ENTITY_ISSUE_STATE)
+                    'issueState': googleConvo.getEntity<string>(ConversationConstants.ENTITY_ISSUE_STATE)
                 }
             )
         }
-        conv.ask(`Would you like me to get issues you've commented on or issues you've created?`);
+        googleConvo.ask(`Would you like me to get issues you've commented on or issues you've created?`);
     }
 });
 
