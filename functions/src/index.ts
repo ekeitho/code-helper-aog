@@ -73,7 +73,7 @@ app.intent(ConversationConstants.INTENT_FIND_ISSUES, async dialogConvo => {
         // issues commented on
         else {
             const commentsToGrab = 20;
-            const res = await GithubHelper.sendGithubGraphQL(googleConvo, GithubHelper.commentsOnIssuesQL(userName));
+            const res = await GithubHelper.sendGithubGraphQL(googleConvo, GithubHelper.commentsOnIssuesQuery(userName));
 
             const issues = res.data.user.issueComments.nodes;
             const actualIssueCount = res.data.user.issueComments.totalCount;

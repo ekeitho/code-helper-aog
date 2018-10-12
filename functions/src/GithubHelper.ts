@@ -29,8 +29,8 @@ export default class GithubHelper {
         return '';
     }
 
-    static createdIssuesQL(username: string, pagination: string = "", state: string = ""): string {
-        return `{user(login:"${username}"){
+    static createdIssuesQuery(username: string, pagination: string = "", state: string = ""): string {
+        const query = `{user(login:"${username}"){
                         issues(first: ${quantity}` + this.paginate(pagination) + this.issueState(state) + `) {
                           nodes {
                             title
@@ -51,10 +51,12 @@ export default class GithubHelper {
                         }
                       }
                    }`;
+        console.log(query);
+        return query;
     }
 
-    static commentsOnIssuesQL(username: string, pagination: string = "", state: string = ""): string {
-        return `{user(login: "${username}") {
+    static commentsOnIssuesQuery(username: string, pagination: string = "", state: string = ""): string {
+        const query = `{user(login: "${username}") {
                                 issueComments(first: ${quantity}` + this.paginate(pagination) + this.issueState(state) + `) {
                                   nodes {
                                     issue {
@@ -79,6 +81,8 @@ export default class GithubHelper {
                                 }
                               }
                             }`;
+        console.log(query);
+        return query;
     }
 
     static async authenticateGithubUser(conv: GoogleConvo): Promise<SocialIdentity> {
@@ -154,7 +158,7 @@ export default class GithubHelper {
     static async firstTimeCreatedIssues(googleConvo: GoogleConvo) {
         const username = googleConvo.getStorage<string>(ConversationConstants.STORAGE_USERNAME);
         const issueState = googleConvo.getContextParamValueOrDefault(ConversationConstants.CONTEXT_FIND_ISSUES, 'issueState', '');
-        const res = await GithubHelper.sendGithubGraphQL(googleConvo, GithubHelper.createdIssuesQL(username, '', issueState));
+        const res = await GithubHelper.sendGithubGraphQL(googleConvo, GithubHelper.createdIssuesQuery(username, '', issueState));
 
         // information for paging
         // endCursor   - forward nav
@@ -231,7 +235,7 @@ export default class GithubHelper {
         const issuesCount = contextParams.issuesCount as number;
         const currentPosition = contextParams.position as number;
         const issueState = contextParams.issueState as string;
-        const res = await GithubHelper.sendGithubGraphQL(googleConvo, GithubHelper.createdIssuesQL(username, contextParams.nextCursor as string, issueState));
+        const res = await GithubHelper.sendGithubGraphQL(googleConvo, GithubHelper.createdIssuesQuery(username, contextParams.nextCursor as string, issueState));
 
         const issues = res.data.user.issues.nodes;
         const pageInfo = res.data.user.issues.pageInfo;
@@ -240,15 +244,16 @@ export default class GithubHelper {
 
 
         if (googleConvo.isScreenDevice()) {
-            console.log('is screen device');
-
             switch (issueEnum) {
                 case IssueEnum.THRESHOLD_MET:
                     googleConvo.ask(`Of the ${issuesCount} issues you've created. I found a few that are open.`);
                     googleConvo.ask(ActionsHelper.generateBrowseCarouselItems(googleConvo, issues));
                     break;
                 case IssueEnum.MANY:
-                    console.log('hello?');
+                    console.log('Many more issues');
+                    console.log('Next position: ' + currentPosition + quantity);
+                    console.log('Issue count: ' + issuesCount);
+
                     googleConvo.setContext(ConversationConstants.CONTEXT_FIND_ISSUES_FOLLOW_UP, 1,
                         {
                             'position': currentPosition + quantity,
@@ -259,8 +264,6 @@ export default class GithubHelper {
                     googleConvo.ask(`Of the ${issuesCount} issues you've created. I found a few that are open.`);
                     googleConvo.ask(ActionsHelper.generateBrowseCarouselItems(googleConvo, issues));
                     break;
-                default:
-                    googleConvo.ask("hmmm");
             }
         } else {
             googleConvo.ask('not a screen?')
