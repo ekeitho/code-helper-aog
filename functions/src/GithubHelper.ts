@@ -190,6 +190,8 @@ export default class GithubHelper {
             googleConvo.getContextParamValueOrDefault<string>(ConversationConstants.CONTEXT_FIND_ISSUES, 'issueState', '');
         const res = await GithubHelper.sendGithubGraphQL(googleConvo, GithubHelper.createdIssuesQuery(username, '', issueState));
 
+        console.log(res);
+
         // information for paging
         // endCursor   - forward nav
         // startCursor - backward nav
@@ -263,6 +265,8 @@ export default class GithubHelper {
             googleConvo.getContextParamValueOrDefault<string>(ConversationConstants.CONTEXT_FIND_ISSUES, 'issueState', '');
         const res = await GithubHelper.sendGithubGraphQL(googleConvo, GithubHelper.commentsOnIssuesQuery(username, ''));
 
+        console.log(res);
+
         const issueComments = res.data.user.issueComments;
         const pageInfo = issueComments.pageInfo;
         const issues = issueComments.nodes;
@@ -287,7 +291,13 @@ export default class GithubHelper {
                     googleConvo.ask(ActionsHelper.generateIssueResponse(filteredIssues));
                     break;
                 case IssueRangeEnum.MANY:
-                    googleConvo.ask(`Here are some issues I found.`);
+
+                    if (filteredIssues.length === 1) {
+                        googleConvo.ask(`Here is an issue I found.`);
+                    } else {
+                        googleConvo.ask(`Here are some issues I found.`);
+                    }
+
                     googleConvo.ask(ActionsHelper.generateIssueResponse(filteredIssues));
                     googleConvo.ask(new Suggestions('more issues'));
                     break;
@@ -319,7 +329,7 @@ export default class GithubHelper {
         const res = await GithubHelper.sendGithubGraphQL(googleConvo, GithubHelper.commentsOnIssuesQuery(username, contextParams.nextCursor as string));
 
         const issues = res.data.user.issueComments.nodes;
-        const pageInfo = res.data.user.issues.pageInfo;
+        const pageInfo = res.data.user.issueComments.pageInfo;
         const filteredIssues = GithubHelper.filterIssuesByState(issues, issueState);
 
         const issueRangeEnum = GithubHelper.getIssueEnum(currentPosition, issuesCount);
@@ -345,7 +355,13 @@ export default class GithubHelper {
                             'issueEnum': contextParams.issueEnum
                         }
                     );
-                    googleConvo.ask(`Here are the next unique ${issueState} issues.`);
+
+                    if (filteredIssues.length === 1) {
+                        googleConvo.ask(`Here is the next unique ${issueState} issue.`);
+                    } else {
+                        googleConvo.ask(`Here are the next unique ${issueState} issues.`);
+                    }
+
                     googleConvo.ask(ActionsHelper.generateIssueResponse(filteredIssues));
                     break;
             }

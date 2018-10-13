@@ -33,11 +33,11 @@ export default class ActionsHelper {
             text: issue.title,
             title: issue.repository.name,
             buttons: new Button({
-                title: 'Issue Url',
+                title: 'link to issue',
                 url: issue.url,
             }),
             image: new Image({
-                url: issue.repository.ownder.avatarUrl,
+                url: issue.repository.owner.avatarUrl,
                 alt: 'avatar image',
             }),
             display: 'CROPPED',
