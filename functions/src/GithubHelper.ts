@@ -2,6 +2,7 @@ import {Authy, SocialIdentity} from "auth0-in-action/lib/Authy";
 import ActionsHelper from "./ActionsHelper";
 import GoogleConvo from "./GoogleConvo";
 import ConversationConstants from "./ConversationConstants";
+import {Suggestions} from "actions-on-google";
 
 const request = require('request-promise-native');
 
@@ -13,7 +14,7 @@ export enum IssueEnum {
     CREATED, COMMENTED
 }
 
-const quantity = 2;
+const quantity = 5;
 
 export default class GithubHelper {
 
@@ -182,6 +183,80 @@ export default class GithubHelper {
         return filteredIssues;
     }
 
+
+    static async firstTimeCreatedIssuesRequest(googleConvo: GoogleConvo) {
+        const username = googleConvo.getStorage<string>(ConversationConstants.STORAGE_USERNAME);
+        const issueState = googleConvo.hasEntity(ConversationConstants.ENTITY_ISSUE_STATE) ? googleConvo.getEntity<string>(ConversationConstants.ENTITY_ISSUE_STATE) :
+            googleConvo.getContextParamValueOrDefault<string>(ConversationConstants.CONTEXT_FIND_ISSUES, 'issueState', '');
+        const res = await GithubHelper.sendGithubGraphQL(googleConvo, GithubHelper.createdIssuesQuery(username, '', issueState));
+
+        // information for paging
+        // endCursor   - forward nav
+        // startCursor - backward nav
+        const pageInfo = res.data.user.issues.pageInfo;
+
+        // based on response, lets set some information
+        const issues = res.data.user.issues.nodes;
+        const issuesCount = res.data.user.issues.totalCount;
+
+        // based on issue count and current position, return
+        const issueRangeEnum = GithubHelper.getIssueEnum(0, issuesCount);
+
+        if (googleConvo.isScreenDevice()) {
+            switch (issueRangeEnum) {
+                case IssueRangeEnum.NONE:
+                    googleConvo.ask(`You have no open created issues. However, you can ask to find issues you've commented on.`);
+                    break;
+                case IssueRangeEnum.ONE:
+                    googleConvo.ask(`You currently have one open created issue.`);
+                    googleConvo.ask(ActionsHelper.generateIssueResponse(issues));
+                    break;
+                case IssueRangeEnum.THRESHOLD_MET:
+                    googleConvo.ask(`Here are all of your created issues I found!`);
+                    googleConvo.ask(ActionsHelper.generateIssueResponse(issues));
+                    break;
+                case IssueRangeEnum.MANY:
+                    googleConvo.ask(`Here are some issues I found.`);
+                    googleConvo.ask(ActionsHelper.generateIssueResponse(issues));
+                    googleConvo.ask(new Suggestions('get more'));
+                    break;
+            }
+        }
+        else {
+            switch (issueRangeEnum) {
+                case IssueRangeEnum.NONE:
+                    googleConvo.ask(`You have no open created issues. However, you can ask to find issues you've commented on.`);
+                    break;
+                case IssueRangeEnum.ONE:
+                    googleConvo.ask(`You currently have one open created issue.`);
+                    googleConvo.ask(`The open issue is ${issues[0].title} under ${issues[0].repository.owner.login}'s repository ${issues[0].repository.name}. Would you like a link to this issue?`);
+                    googleConvo.saveToStorage('issue', issues[0]);
+                    break;
+                case IssueRangeEnum.THRESHOLD_MET:
+                    googleConvo.ask(`Of the ${issuesCount} issues you've created. I found a few that are open.`);
+                    googleConvo.ask(`The first issue is ${issues[0].title} under ${issues[0].repository.owner.login}'s repository ${issues[0].repository.name}. Would you like a link to this issue or get the next issue?`);
+                    googleConvo.saveToStorage('issue', issues[0]);
+                    break;
+                case IssueRangeEnum.MANY:
+                    googleConvo.ask(`Of the ${issuesCount} issues you've created. I found a few that are open.`);
+                    googleConvo.ask(`The first issue is ${issues[0].title} under ${issues[0].repository.owner.login}'s repository ${issues[0].repository.name}. Would you like a link to this issue or get the next issue?`);
+                    googleConvo.saveToStorage('issue', issues[0]);
+                    break;
+            }
+        }
+
+        if (issueRangeEnum === IssueRangeEnum.MANY) {
+            googleConvo.setContext(ConversationConstants.CONTEXT_FIND_ISSUES_FOLLOW_UP, 1,
+                {
+                    'position': quantity,
+                    'issuesCount': issuesCount,
+                    'nextCursor': pageInfo.endCursor,
+                    'issueState': issueState,
+                    'issueEnum' : IssueEnum.CREATED
+                });
+        }
+    }
+
     static async firstTimeCommentedIssuesRequest(googleConvo: GoogleConvo) {
         const username = googleConvo.getStorage<string>(ConversationConstants.STORAGE_USERNAME);
         const issueState = googleConvo.hasEntity(ConversationConstants.ENTITY_ISSUE_STATE) ? googleConvo.getEntity<string>(ConversationConstants.ENTITY_ISSUE_STATE) :
@@ -205,15 +280,16 @@ export default class GithubHelper {
                     break;
                 case IssueRangeEnum.ONE:
                     googleConvo.ask(`You currently have only one open commented issue.`);
-                    googleConvo.ask(ActionsHelper.generateBrowseCarouselItems(googleConvo, filteredIssues));
+                    googleConvo.ask(ActionsHelper.generateIssueResponse(filteredIssues));
                     break;
                 case IssueRangeEnum.THRESHOLD_MET:
                     googleConvo.ask(`Here are all the unique ${issueState} issues you've commented on.`);
-                    googleConvo.ask(ActionsHelper.generateBrowseCarouselItems(googleConvo, filteredIssues));
+                    googleConvo.ask(ActionsHelper.generateIssueResponse(filteredIssues));
                     break;
                 case IssueRangeEnum.MANY:
-                    googleConvo.ask(`Of the past ${totalIssueCommentCount} issues you've commented on. Here are a few unique ${issueState} issues.`);
-                    googleConvo.ask(ActionsHelper.generateBrowseCarouselItems(googleConvo, filteredIssues));
+                    googleConvo.ask(`Here are some issues I found.`);
+                    googleConvo.ask(ActionsHelper.generateIssueResponse(filteredIssues));
+                    googleConvo.ask(new Suggestions('more issues'));
                     break;
             }
         }
@@ -253,7 +329,7 @@ export default class GithubHelper {
             switch (issueRangeEnum) {
                 case IssueRangeEnum.THRESHOLD_MET:
                     googleConvo.ask(`Here are the last of the unique ${issueState} issues.`);
-                    googleConvo.ask(ActionsHelper.generateBrowseCarouselItems(googleConvo, filteredIssues));
+                    googleConvo.ask(ActionsHelper.generateIssueResponse(filteredIssues));
                     break;
                 case IssueRangeEnum.MANY:
                     console.log('Many more commented issues');
@@ -270,84 +346,11 @@ export default class GithubHelper {
                         }
                     );
                     googleConvo.ask(`Here are the next unique ${issueState} issues.`);
-                    googleConvo.ask(ActionsHelper.generateBrowseCarouselItems(googleConvo, filteredIssues));
+                    googleConvo.ask(ActionsHelper.generateIssueResponse(filteredIssues));
                     break;
             }
         } else {
             googleConvo.ask('not a screen?')
-        }
-    }
-
-
-    static async firstTimeCreatedIssuesRequest(googleConvo: GoogleConvo) {
-        const username = googleConvo.getStorage<string>(ConversationConstants.STORAGE_USERNAME);
-        const issueState = googleConvo.hasEntity(ConversationConstants.ENTITY_ISSUE_STATE) ? googleConvo.getEntity<string>(ConversationConstants.ENTITY_ISSUE_STATE) :
-            googleConvo.getContextParamValueOrDefault<string>(ConversationConstants.CONTEXT_FIND_ISSUES, 'issueState', '');
-        const res = await GithubHelper.sendGithubGraphQL(googleConvo, GithubHelper.createdIssuesQuery(username, '', issueState));
-
-        // information for paging
-        // endCursor   - forward nav
-        // startCursor - backward nav
-        const pageInfo = res.data.user.issues.pageInfo;
-
-        // based on response, lets set some information
-        const issues = res.data.user.issues.nodes;
-        const issuesCount = res.data.user.issues.totalCount;
-
-        // based on issue count and current position, return
-        const issueRangeEnum = GithubHelper.getIssueEnum(0, issuesCount);
-
-        if (googleConvo.isScreenDevice()) {
-            switch (issueRangeEnum) {
-                case IssueRangeEnum.NONE:
-                    googleConvo.ask(`You have no open created issues. However, you can ask to find issues you've commented on.`);
-                    break;
-                case IssueRangeEnum.ONE:
-                    googleConvo.ask(`You currently have one open created issue.`);
-                    googleConvo.ask(ActionsHelper.generateBrowseCarouselItems(googleConvo, issues));
-                    break;
-                case IssueRangeEnum.THRESHOLD_MET:
-                    googleConvo.ask(`Of the ${issuesCount} issues you've created. I found a few that are open.`);
-                    googleConvo.ask(ActionsHelper.generateBrowseCarouselItems(googleConvo, issues));
-                    break;
-                case IssueRangeEnum.MANY:
-                    googleConvo.ask(`Of the ${issuesCount} issues you've created. I found a few that are open.`);
-                    googleConvo.ask(ActionsHelper.generateBrowseCarouselItems(googleConvo, issues));
-                    break;
-            }
-        }
-        else {
-            switch (issueRangeEnum) {
-                case IssueRangeEnum.NONE:
-                    googleConvo.ask(`You have no open created issues. However, you can ask to find issues you've commented on.`);
-                    break;
-                case IssueRangeEnum.ONE:
-                    googleConvo.ask(`You currently have one open created issue.`);
-                    googleConvo.ask(`The open issue is ${issues[0].title} under ${issues[0].repository.owner.login}'s repository ${issues[0].repository.name}. Would you like a link to this issue?`);
-                    googleConvo.saveToStorage('issue', issues[0]);
-                    break;
-                case IssueRangeEnum.THRESHOLD_MET:
-                    googleConvo.ask(`Of the ${issuesCount} issues you've created. I found a few that are open.`);
-                    googleConvo.ask(`The first issue is ${issues[0].title} under ${issues[0].repository.owner.login}'s repository ${issues[0].repository.name}. Would you like a link to this issue or get the next issue?`);
-                    googleConvo.saveToStorage('issue', issues[0]);
-                    break;
-                case IssueRangeEnum.MANY:
-                    googleConvo.ask(`Of the ${issuesCount} issues you've created. I found a few that are open.`);
-                    googleConvo.ask(`The first issue is ${issues[0].title} under ${issues[0].repository.owner.login}'s repository ${issues[0].repository.name}. Would you like a link to this issue or get the next issue?`);
-                    googleConvo.saveToStorage('issue', issues[0]);
-                    break;
-            }
-        }
-
-        if (issueRangeEnum === IssueRangeEnum.MANY) {
-            googleConvo.setContext(ConversationConstants.CONTEXT_FIND_ISSUES_FOLLOW_UP, 1,
-                {
-                    'position': quantity,
-                    'issuesCount': issuesCount,
-                    'nextCursor': pageInfo.endCursor,
-                    'issueState': issueState,
-                    'issueEnum' : IssueEnum.CREATED
-                });
         }
     }
 
@@ -373,7 +376,7 @@ export default class GithubHelper {
             switch (issueRangeEnum) {
                 case IssueRangeEnum.THRESHOLD_MET:
                     googleConvo.ask(`Of the ${issuesCount} issues you've created. I found a few that are open.`);
-                    googleConvo.ask(ActionsHelper.generateBrowseCarouselItems(googleConvo, issues));
+                    googleConvo.ask(ActionsHelper.generateIssueResponse(issues));
                     break;
                 case IssueRangeEnum.MANY:
                     console.log('Many more created issues');
@@ -390,7 +393,7 @@ export default class GithubHelper {
                         }
                     );
                     googleConvo.ask(`Of the ${issuesCount} issues you've created. I found a few that are open.`);
-                    googleConvo.ask(ActionsHelper.generateBrowseCarouselItems(googleConvo, issues));
+                    googleConvo.ask(ActionsHelper.generateIssueResponse(issues));
                     break;
             }
         } else {
