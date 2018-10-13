@@ -242,7 +242,7 @@ export default class GithubHelper {
         const issueState = contextParams.issueState as string;
         const res = await GithubHelper.sendGithubGraphQL(googleConvo, GithubHelper.commentsOnIssuesQuery(username, contextParams.nextCursor as string));
 
-        const issues = res.data.user.issuesComments.nodes;
+        const issues = res.data.user.issueComments.nodes;
         const pageInfo = res.data.user.issues.pageInfo;
         const filteredIssues = GithubHelper.filterIssuesByState(issues, issueState);
 
