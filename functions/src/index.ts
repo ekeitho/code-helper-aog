@@ -1,6 +1,6 @@
 import * as functions from 'firebase-functions';
-import {NewSurface, NewSurfaceOptions, SignIn} from "actions-on-google";
-import GithubHelper from "./GithubHelper";
+import {NewSurface, NewSurfaceOptions} from "actions-on-google";
+import GithubHelper, {IssueEnum} from "./GithubHelper";
 import ActionsHelper from "./ActionsHelper";
 import GoogleConvo from "./GoogleConvo";
 import ConversationConstants from "./ConversationConstants";
@@ -55,53 +55,29 @@ app.intent('send_link', (conv) => {
 
 app.intent(ConversationConstants.INTENT_FIND_MORE_ISSUES, async conv => {
     const googleConvo = new GoogleConvo(conv);
-    await GithubHelper.nextCreatedIssues(googleConvo);
+    const issueEnum = googleConvo.getContextParamValueOrDefault<IssueEnum>(ConversationConstants.CONTEXT_FIND_ISSUES_FOLLOW_UP, 'issueEnum', IssueEnum.CREATED);
+
+    if (issueEnum === IssueEnum.CREATED) {
+        await GithubHelper.nextCreatedIssues(googleConvo);
+    } else {
+        await GithubHelper.nextCommentedIssues(googleConvo);
+    }
+
 });
 
 
 app.intent(ConversationConstants.INTENT_FIND_ISSUES, async dialogConvo => {
     const googleConvo = new GoogleConvo(dialogConvo);
 
-    const userName = googleConvo.getStorage<string>(ConversationConstants.STORAGE_USERNAME);
-
     // we got an entity
     if (googleConvo.hasEntity(ConversationConstants.ENTITY_ISSUES)) {
-        // created issues
         if (googleConvo.getEntity<string>(ConversationConstants.ENTITY_ISSUES) === 'create') {
-            await GithubHelper.firstTimeCreatedIssues(googleConvo);
+            // created issues
+            await GithubHelper.firstTimeCreatedIssuesRequest(googleConvo);
         }
-        // issues commented on
         else {
-            const commentsToGrab = 20;
-            const res = await GithubHelper.sendGithubGraphQL(googleConvo, GithubHelper.commentsOnIssuesQuery(userName));
-
-            const issues = res.data.user.issueComments.nodes;
-            const actualIssueCount = res.data.user.issueComments.totalCount;
-            const min = actualIssueCount < commentsToGrab ? actualIssueCount : commentsToGrab;
-
-            const openIssuesNodes: object = {};
-            let openIssuesCount = 0;
-
-            issues.forEach(node => {
-                if (!node.issue.closed) {
-                    // if issue is not closed and doesnt exist in our dict, then add it
-                    if (!openIssuesNodes.hasOwnProperty(node.issue.id)) {
-                        openIssuesNodes[node.issue.id] = node.issue;
-                        openIssuesCount++;
-                    }
-                }
-            });
-
-            const openIssues = [];
-            for (const key in openIssuesNodes) {
-                openIssues.push(openIssuesNodes[key]);
-            }
-
-            googleConvo.ask(`The past ${min} comments you made on issues. ${openIssuesCount} of them are open.`);
-            if (googleConvo.isScreenDevice()) {
-                googleConvo.setContext(ConversationConstants.CONTEXT_FIND_ISSUES_FOLLOW_UP, 1, {'position': 1, 'issue_count': 10});
-                googleConvo.ask(ActionsHelper.generateBrowseCarouselItems(googleConvo, openIssues));
-            }
+            // commented on issues
+            await GithubHelper.firstTimeCommentedIssuesRequest(googleConvo);
         }
     } else {
         // if user asked for open/closed issues, but didn't specify created or commented on
